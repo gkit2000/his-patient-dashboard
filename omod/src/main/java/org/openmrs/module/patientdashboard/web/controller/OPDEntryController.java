@@ -80,7 +80,6 @@ import org.openmrs.module.hospitalcore.model.PatientSearch;
 import org.openmrs.module.hospitalcore.model.Question;
 import org.openmrs.module.hospitalcore.model.Symptom;
 import org.openmrs.module.hospitalcore.util.ConceptComparator;
-import org.openmrs.module.hospitalcore.util.HospitalCoreConstants;
 import org.openmrs.module.hospitalcore.util.PatientDashboardConstants;
 import org.openmrs.module.hospitalcore.util.PatientUtils;
 import org.springframework.stereotype.Controller;
@@ -106,6 +105,25 @@ public class OPDEntryController {
 		Concept opdWardConcept = Context.getConceptService().getConceptByName(
 				Context.getAdministrationService().getGlobalProperty(
 						PatientDashboardConstants.PROPERTY_OPDWARD));
+		
+		Concept cSymptom = Context.getConceptService().getConceptByName("SYMPTOM");
+		
+		Concept cpDiagnosis = Context.getConceptService().getConceptByName("PROVISIONAL DIAGNOSIS");
+		
+		Concept cFinalDiagnosis = Context.getConceptService().getConceptByName("FINAL DIAGNOSIS");
+		
+		Concept cProcedure = Context.getConceptService().getConceptByName("Post for procedure");
+		
+		Concept cInvestigation = Context.getConceptService().getConceptByName("INVESTIGATION");
+		
+		Patient patient = Context.getPatientService().getPatient(patientId);
+		patient.getPatientIdentifier();
+		
+		PatientQueueService queueService = Context
+				.getService(PatientQueueService.class);
+		
+		Encounter enc = queueService.getLastOPDEncounter(patient);
+		
 		model.addAttribute("listInternalReferral",
 				opdWardConcept != null ? new ArrayList<ConceptAnswer>(
 						opdWardConcept.getAnswers()) : null);
@@ -157,14 +175,14 @@ public class OPDEntryController {
 			Collections.sort(diagnosisList, new ConceptComparator());
 		}
 		model.addAttribute("diagnosisList", diagnosisList);
-
+		
 		// model.addAttribute("listDiagnosis", diagnosis);
-		List<Concept> procedures = patientDashboardService
-				.listByDepartmentByWard(opdId, DepartmentConcept.TYPES[1]);
-		if (CollectionUtils.isNotEmpty(procedures)) {
-			Collections.sort(procedures, new ConceptComparator());
-		}
-		model.addAttribute("listProcedures", procedures);
+				List<Concept> procedures = patientDashboardService
+						.listByDepartmentByWard(opdId, DepartmentConcept.TYPES[1]);
+				if (CollectionUtils.isNotEmpty(procedures)) {
+					Collections.sort(procedures, new ConceptComparator());
+				}
+				model.addAttribute("listProcedures", procedures);
 
 		List<Concept> investigations = patientDashboardService
 				.listByDepartmentByWard(opdId, DepartmentConcept.TYPES[2]);
@@ -188,8 +206,6 @@ public class OPDEntryController {
 		SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy hh:mm a");
 		model.addAttribute("currentDateTime", sdf.format(new Date()));
 
-		Patient patient = Context.getPatientService().getPatient(patientId);
-		patient.getPatientIdentifier();
 		String patientName;
 		if (patient.getMiddleName() != null) {
 			patientName = patient.getGivenName() + " "
@@ -227,26 +243,28 @@ public class OPDEntryController {
 		model.addAttribute("user", user);
 		
 		//New Requirement "Editable Dashboard" //
-		PatientQueueService queueService = Context
-				.getService(PatientQueueService.class);
 		
 		Patient p = new Patient(patientId);
 		Integer personId = p.getPersonId();
-		Encounter enc= queueService.getLastOPDEncounter(patient);
-		List<Obs> diagnosis= queueService.getAllDiagnosis(personId);
+
 		Set<Concept> diagnosisIdSet = new LinkedHashSet<Concept>();
 		Set<ConceptName> diagnosisNameSet = new LinkedHashSet<ConceptName>();
-		 
-		for(Obs diagnos:diagnosis){
-			if(diagnos.getEncounter().getId().equals(enc.getEncounterId()))
-			{
-				
-				diagnosisIdSet.add(diagnos.getValueCoded());
-				diagnosisNameSet.add(diagnos.getValueCoded().getName());
-				
+
+		if (enc != null) {
+
+			List<Obs> diagnosis = queueService.getObsByEncounterAndConcept(enc, cpDiagnosis);
+			if( diagnosis.isEmpty() ||  diagnosis==null) {
+		    diagnosis = queueService.getObsByEncounterAndConcept(enc, cFinalDiagnosis);
 			}
-			
-		 }
+
+		    for (Obs diagnos : diagnosis) {
+
+		        if (diagnos.getValueCoded() != null) {
+		            diagnosisIdSet.add(diagnos.getValueCoded());
+		            diagnosisNameSet.add(diagnos.getValueCoded().getName());
+		        }
+		    }
+		}
 		Set<String> diaNameSet = new LinkedHashSet<String>();
 		Iterator itr = diagnosisNameSet.iterator();
 		while(itr.hasNext())
@@ -257,21 +275,71 @@ public class OPDEntryController {
 		model.addAttribute("diagnosisIdSet", diagnosisIdSet);
 		model.addAttribute("diaNameSet", diaNameSet);
 		//Symptom
-		List<Obs> symptom= queueService.getAllSymptom(personId);
 		Set<Concept> symptomIdSet = new LinkedHashSet<Concept>();
-		Set<ConceptName> symptomNameSet = new LinkedHashSet<ConceptName>();
-		for(Obs symp:symptom){
-			 symptomIdSet.add(symp.getValueCoded());
-			 symptomNameSet.add(symp.getValueCoded().getName());
-		}
 		Set<String> symNameSet = new LinkedHashSet<String>();
-		Iterator itr1 = symptomNameSet.iterator();
-		while(itr1.hasNext())
-		{
-			symNameSet.add((itr1.next().toString()).replaceAll(",", "@"));
+		
+		if (enc != null) {
+
+		    List<Obs> symptom = queueService.getObsByEncounterAndConcept(enc, cSymptom);
+
+		    for (Obs symp : symptom) {
+
+		        if (symp.getValueCoded() != null) {
+		        	symptomIdSet.add(symp.getValueCoded());
+		        	symNameSet.add(symp.getValueCoded().getName().toString()
+		                    .replaceAll(",", "@"));
+		        }
+		    }
 		}
+		
 		model.addAttribute("symptomIdSet", symptomIdSet);
 		model.addAttribute("symNameSet", symNameSet);
+		
+		//procedure
+		Set<Concept> procedureIdSet = new LinkedHashSet<Concept>();
+		Set<ConceptName> procedureNameSet = new LinkedHashSet<ConceptName>();
+
+		if (enc != null && cProcedure != null) {
+
+		    List<Obs> procedureObs = queueService
+		            .getObsByEncounterAndConcept(enc, cProcedure);
+
+		    for (Obs obs : procedureObs) {
+
+		        if (obs.getValueCoded() != null) {
+		            procedureIdSet.add(obs.getValueCoded());
+		            procedureNameSet.add(obs.getValueCoded().getName());
+		        }
+		    }
+		}
+		
+		model.addAttribute("procedureIdSet", procedureIdSet);
+		model.addAttribute("procedureNameSet", procedureNameSet);
+		
+		//investigation
+		Set<Concept> investigationIdSet = new LinkedHashSet<Concept>();
+		Set<ConceptName> investigationNameSet = new LinkedHashSet<ConceptName>();
+
+		if (enc != null && cInvestigation != null) {
+
+		    List<Obs> invObs = queueService
+		            .getObsByEncounterAndConcept(enc, cInvestigation);
+
+		    for (Obs obs : invObs) {
+
+		        if (obs.getValueCoded() != null) {
+
+		            Concept concept = obs.getValueCoded();
+
+		            investigationIdSet.add(concept);
+		            investigationNameSet.add(concept.getName());
+		        }
+		    }
+		}
+
+		model.addAttribute("investigationIdSet", investigationIdSet);
+		model.addAttribute("investigationNameSet", investigationNameSet);
+		
 		Map<Integer, String> ipdConceptMap = new LinkedHashMap<Integer, String>();
 		for(ConceptAnswer ipdcon:ipdConcept.getAnswers()){
 			ipdConceptMap.put(ipdcon.getAnswerConcept().getId(), ipdcon.getAnswerConcept().getName().toString());
@@ -292,6 +360,9 @@ public class OPDEntryController {
 		else{
 			model.addAttribute("ipdPatientAdmission",false);	
 		}
+		
+		List<OpdDrugOrder> opdDrugOrders=patientDashboardService.getOpdDrugOrder(enc);
+		model.addAttribute("opdDrugOrders", opdDrugOrders);
 
         return "module/patientdashboard/opdEntry";
 	}
@@ -1175,7 +1246,7 @@ public class OPDEntryController {
 		}
 		 
 		return "redirect:/module/patientqueue/main.htm?opdId="
-				+ opdPatientLog.getOpdConcept().getId();
+				+ command.getOpdId();
 
 	}
 

@@ -203,8 +203,169 @@ function loadSelectedSymptomList()
 	}		
 		
 }
+
+//procedure
+function loadSelectedProcedureList()
+{
+    if(${procedureIdSet}.length > 0)
+    {
+        var proIdToBeAdded = ('${procedureIdSet}');
+        var proNameToBeAdded = ('${procedureNameSet}');
+
+        proIdToBeAdded = proIdToBeAdded.substr(1);
+        proIdToBeAdded = proIdToBeAdded.substring(0, proIdToBeAdded.length - 1);
+
+        proNameToBeAdded = proNameToBeAdded.substr(1);
+        proNameToBeAdded = proNameToBeAdded.substring(0, proNameToBeAdded.length - 1);
+
+        var pIdArr = proIdToBeAdded.split(",");
+        var pNameArr = proNameToBeAdded.split(",");
+
+        var spl = $("#selectedProcedureList");
+
+        for (var i = 0; i < pIdArr.length; i++)
+        {
+            pNameArr[i] = pNameArr[i].replaceAll("@", ",");
+            spl.append("<option value='" + pIdArr[i].trim() + "'>" + pNameArr[i].trim() + "</option>");
+        }
+    }
+}
+
+//investigation
+function loadSelectedInvestigationList()
+{
+    if(${investigationIdSet}.length > 0)
+    {
+        var invIdToBeAdded = ('${investigationIdSet}');
+        var invNameToBeAdded = ('${investigationNameSet}');
+
+        invIdToBeAdded = invIdToBeAdded.substr(1);
+        invIdToBeAdded = invIdToBeAdded.substring(0, invIdToBeAdded.length - 1);
+
+        invNameToBeAdded = invNameToBeAdded.substr(1);
+        invNameToBeAdded = invNameToBeAdded.substring(0, invNameToBeAdded.length - 1);
+
+        var iIdArr = invIdToBeAdded.split(",");
+        var iNameArr = invNameToBeAdded.split(",");
+
+        var sil = $("#selectedInvestigationList");
+
+        for (var i = 0; i < iIdArr.length; i++)
+        {
+            iNameArr[i] = iNameArr[i].replaceAll("@", ",");
+            sil.append("<option value='" + iIdArr[i].trim() + "'>" + iNameArr[i].trim() + "</option>");
+        }
+    }
+}
+
+//Drug
+function addPreviousOpdDrug(drugName, formulationName, formulationId,
+                            frequencyName, frequencyId, noOfDays, comments) {
+
+    var value = drugName + "+" + formulationName;
+
+    var valueArr = value.split("+");
+
+    var formulationArr = [
+        formulationName,
+        formulationId
+    ];
+
+    var frequencyArr = [
+        frequencyName,
+        frequencyId
+    ];
+
+    var deleteString = 'deleteInput(\"' + value + '\")';
+
+    var htmlText =
+          "<div id='com_" + value + "_div'>"
+
+        + "<input id='" + value + "_names' "
+        + "name='drugOrder' "
+        + "value='" + value + "' "
+        + "type='hidden' />&nbsp;&nbsp;"
+
+        + "<input id='" + value + "_name' "
+        + "name='" + value + "drugOrder' "
+        + "type='text' "
+        + "size='14' "
+        + "value='" + valueArr[0] + "' "
+        + "readonly='readonly'/>&nbsp;&nbsp;"
+
+        + "<input id='" + value + "_formulationName' "
+        + "name='" + value + "_formulationName' "
+        + "type='text' "
+        + "size='14' "
+        + "value='" + formulationArr[0] + "' "
+        + "readonly='readonly'/>&nbsp;&nbsp;"
+
+        + "<input id='" + value + "_frequencyName' "
+        + "name='" + value + "_frequencyName' "
+        + "type='text' "
+        + "size='6' "
+        + "value='" + frequencyArr[0] + "' "
+        + "readonly='readonly'/>&nbsp;&nbsp;"
+
+        + "<input id='" + value + "_noOfDays' "
+        + "name='" + value + "_noOfDays' "
+        + "type='text' "
+        + "size='7' "
+        + "value='" + noOfDays + "' "
+        + "readonly='readonly'/>&nbsp;&nbsp;"
+
+        + "<input id='" + value + "_comments' "
+        + "name='" + value + "_comments' "
+        + "type='text' "
+        + "size='17' "
+        + "value='" + comments + "' "
+        + "readonly='readonly'/>&nbsp;&nbsp;"
+
+        + "<input id='" + value + "_formulationId' "
+        + "name='" + value + "_formulationId' "
+        + "type='hidden' "
+        + "value='" + formulationArr[1] + "' />&nbsp;"
+
+        + "<input id='" + value + "_frequencyId' "
+        + "name='" + value + "_frequencyId' "
+        + "type='hidden' "
+        + "value='" + frequencyArr[1] + "' />&nbsp;"
+
+        + "<a style='color:red' "
+        + "href='#' "
+        + "onclick='" + deleteString + "'>[X]</a>"
+
+        + "</div>";
+
+    var newElement = document.createElement('div');
+
+    newElement.setAttribute("id", value);
+
+    newElement.innerHTML = htmlText;
+
+    var fieldsArea = document.getElementById('headerValue');
+
+    fieldsArea.appendChild(newElement);
+}
+
+
 loadSelectedDiagnosisList();
 loadSelectedSymptomList();
+loadSelectedProcedureList();
+loadSelectedInvestigationList();
+
+<c:forEach items="${opdDrugOrders}" var="drugOrder">
+addPreviousOpdDrug(
+            "${drugOrder.inventoryDrug.name}",
+            "${drugOrder.inventoryDrugFormulation.name}",
+            "${drugOrder.inventoryDrugFormulation.id}",
+            "${drugOrder.frequency.name}",
+            "${drugOrder.frequency.conceptId}",
+            "${drugOrder.noOfDays}",
+            "${drugOrder.comments}"
+        );
+
+    </c:forEach>
 		});
 </script>
 <script type="text/javascript">
@@ -331,6 +492,119 @@ document.onkeypress = stopRKey;
    jQuery("#noOfDays").val("");
    jQuery("#comments").val("");
    }
+}
+
+function resetOpdForm() {
+
+    // =========================
+    // RESET SYMPTOMS
+    // =========================
+    var selectedSymptoms = document.getElementById("selectedSymptomList");
+    var availableSymptoms = document.getElementById("availableSymptomList");
+
+    if (selectedSymptoms && availableSymptoms) {
+        while (selectedSymptoms.options.length > 0) {
+            availableSymptoms.appendChild(selectedSymptoms.options[0]);
+        }
+    }
+
+    // Clear symptom search box
+    if (document.getElementById("symptom")) {
+        jQuery("#symptom").val("");
+    }
+
+
+    // =========================
+    // RESET DIAGNOSIS
+    // =========================
+    var selectedDiagnosis = document.getElementById("selectedDiagnosisList");
+    var availableDiagnosis = document.getElementById("availableDiagnosisList");
+
+    if (selectedDiagnosis && availableDiagnosis) {
+        while (selectedDiagnosis.options.length > 0) {
+            availableDiagnosis.appendChild(selectedDiagnosis.options[0]);
+        }
+    }
+
+    // Clear diagnosis search box
+    if (document.getElementById("diagnosis")) {
+        jQuery("#diagnosis").val("");
+    }
+
+
+    // =========================
+    // RESET PROCEDURE
+    // =========================
+    var selectedProcedure = document.getElementById("selectedProcedureList");
+    var availableProcedure = document.getElementById("availableProcedureList");
+
+    if (selectedProcedure && availableProcedure) {
+        while (selectedProcedure.options.length > 0) {
+            availableProcedure.appendChild(selectedProcedure.options[0]);
+        }
+    }
+
+    // Clear procedure search box
+    if (document.getElementById("procedure")) {
+        jQuery("#procedure").val("");
+    }
+
+
+    // =========================
+    // RESET INVESTIGATION
+    // =========================
+    var selectedInvestigation =
+        document.getElementById("selectedInvestigationList");
+
+    var availableInvestigation =
+        document.getElementById("availableInvestigationList");
+
+    if (selectedInvestigation && availableInvestigation) {
+        while (selectedInvestigation.options.length > 0) {
+            availableInvestigation.appendChild(
+                selectedInvestigation.options[0]
+            );
+        }
+    }
+
+    // Clear investigation search box
+    if (document.getElementById("investigation")) {
+        jQuery("#investigation").val("");
+    }
+
+
+    // =========================
+    // RESET DRUGS
+    // =========================
+
+    // Clear the JavaScript drug list
+    if (typeof drugIssuedList1 !== "undefined") {
+        drugIssuedList1.length = 0;
+    }
+
+    // Remove dynamically added drugs
+    var headerValue = document.getElementById("headerValue");
+
+    if (headerValue) {
+
+        // Your headerValue contains 6 header input fields.
+        // Everything after those is dynamically added drug data.
+        while (headerValue.children.length > 6) {
+            headerValue.removeChild(
+                headerValue.children[headerValue.children.length - 1]
+            );
+        }
+    }
+
+    // Clear drug selection fields
+    jQuery("#drugName").val("");
+    jQuery("#formulation").val("");
+    jQuery("#frequency").val("");
+    jQuery("#noOfDays").val("");
+    jQuery("#comments").val("");
+
+
+    alert("Symptoms, Diagnosis, Procedure, Investigation and Drugs have been reset.");
 }
 
 function deleteInput(drugName) {
@@ -606,6 +880,10 @@ jQuery("#BMI").val(b);
 							<input type="submit"
 								class="ui-button ui-widget ui-state-default ui-corner-all"
 								value="Back" onclick="DASHBOARD.backToQueue('${queueId}');" />
+							 <input type="button"
+            value="Reset"
+            class="ui-button ui-widget ui-state-default ui-corner-all"
+            onclick="resetOpdForm();" />
 						</c:when>
 						<c:otherwise>
 							<input type="submit" value="Conclude visit"
@@ -615,6 +893,10 @@ jQuery("#BMI").val(b);
 								class="ui-button ui-widget ui-state-default ui-corner-all"
 								value="Back"
 								onclick="DASHBOARD.backToQueue('${referral.conceptId}');" />
+							 <input type="button"
+            value="Reset"
+            class="ui-button ui-widget ui-state-default ui-corner-all"
+            onclick="resetOpdForm();" />
 						</c:otherwise>
 					</c:choose></td>
 			</tr>
@@ -977,6 +1259,8 @@ jQuery("#BMI").val(b);
 							type='text' id='comments' name='comments' value='Comments'
 							size="17" readonly="readonly" />&nbsp;
 					</div>
+					<!-- PREVIOUS OPD DRUGS WILL COME HERE -->
+<div id="previousDrugList"></div>
 				</td>
 			</tr>
 			<tr>

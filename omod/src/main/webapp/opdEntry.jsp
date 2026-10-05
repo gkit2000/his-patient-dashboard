@@ -346,6 +346,12 @@ function addPreviousOpdDrug(drugName, formulationName, formulationId,
     var fieldsArea = document.getElementById('headerValue');
 
     fieldsArea.appendChild(newElement);
+    
+    // Add previous-visit drug to print list
+    if (typeof drugIssuedList1 !== "undefined" &&
+        drugIssuedList1.indexOf(value) === -1) {
+        drugIssuedList1.push(value);
+    }
 }
 
 
@@ -357,7 +363,7 @@ loadSelectedInvestigationList();
 <c:forEach items="${opdDrugOrders}" var="drugOrder">
 addPreviousOpdDrug(
             "${drugOrder.inventoryDrug.name}",
-            "${drugOrder.inventoryDrugFormulation.name}",
+            "${drugOrder.inventoryDrugFormulation.name}-${drugOrder.inventoryDrugFormulation.dozage}",
             "${drugOrder.inventoryDrugFormulation.id}",
             "${drugOrder.frequency.name}",
             "${drugOrder.frequency.conceptId}",
@@ -366,6 +372,7 @@ addPreviousOpdDrug(
         );
 
     </c:forEach>
+    updateDrugIssuedList();
 		});
 </script>
 <script type="text/javascript">
@@ -428,22 +435,29 @@ document.onkeypress = stopRKey;
 		_ipdConceptMap[${entry.key}] = "${entry.value}";
 	</c:forEach>
 
-	var drugIssuedList1 = new Array();
+	var drugIssuedList1 = [];
+	function updateDrugIssuedList() {
+    drugIssuedList1.length = 0;
+
+    var drugDivs = document.querySelectorAll("#headerValue > div");
+
+    for (var i = 0; i < drugDivs.length; i++) {
+        var hiddenInput = drugDivs[i].querySelector("input[name='drugOrder']");
+
+        if (hiddenInput && hiddenInput.value) {
+            drugIssuedList1.push(hiddenInput.value);
+        }
+    }
+}
+
 	function addDrugOrder() {
 	   var drugName=document.getElementById('drugName').value.toString();
 	   if(drugName==null || drugName==""){
 	   alert("Please enter drug name");
 	   return false;
 	   }
-	   else{
+	  
 	   var formulation=document.getElementById('formulation').value;
-	   drugIssuedList1.push(drugName.concat("+").concat(formulation));
-	  var i;var value;
-	   for(i=0;i<drugIssuedList1.length;i++)
-		   {
-		    value=drugIssuedList1[i];
-		   }
-	   var valueArr=value.split("+");  
 	  
    if(formulation==null || formulation==""){
    alert("Please select formulation");
@@ -461,13 +475,21 @@ document.onkeypress = stopRKey;
    alert("Please enter no of days");
    return false;
    }
-   if (noOfDays!=null || noOfDays!=""){
-    if(isNaN(noOfDays)){
+   if (isNaN(noOfDays)) {
     alert("Please enter no of days in correct format");
     return false;
-    }
    }
    var comments=document.getElementById('comments').value;
+   
+   var value = drugName + "+" + formulation;
+   // Prevent duplicate drug
+    if (drugIssuedList1.indexOf(value) !== -1) {
+        alert("This drug is already added");
+        return false;
+    }
+
+    var valueArr = value.split("+");
+    
    var deleteString = 'deleteInput(\"'+value+'\")';
    var htmlText =  "<div id='com_"+value+"_div'>"
  	 +"<input id='"+value+"_names'  name='drugOrder' value='"+value+"' type='hidden' />&nbsp;&nbsp;"
@@ -486,12 +508,16 @@ document.onkeypress = stopRKey;
    newElement.innerHTML = htmlText;
    var fieldsArea = document.getElementById('headerValue');
    fieldsArea.appendChild(newElement);
+   
+   // Rebuild drugIssuedList1 from UI
+   updateDrugIssuedList();
+   
    jQuery("#drugName").val("");
    jQuery("#formulation").val("");
    jQuery("#frequency").val("");
    jQuery("#noOfDays").val("");
    jQuery("#comments").val("");
-   }
+   
 }
 
 function resetOpdForm() {
@@ -608,12 +634,16 @@ function resetOpdForm() {
 }
 
 function deleteInput(drugName) {
-   var parentDiv = 'headerValue';
-   var child = document.getElementById(drugName);
-   var parent = document.getElementById(parentDiv);
-   parent.removeChild(child); 
-   Array.prototype.remove = function(v) { this.splice(this.indexOf(v) == -1 ? this.length : this.indexOf(v), 1); }
-   drugIssuedList.remove(drugName);
+
+    // Remove drug from UI
+    var child = document.getElementById(drugName);
+
+    if (child) {
+        child.parentNode.removeChild(child);
+    }
+
+    // Rebuild drugIssuedList1 from remaining UI drugs
+    updateDrugIssuedList();
 }
 
 //Symptom
@@ -656,6 +686,64 @@ function viewQuestion(){
 	var url = "#TB_inline?height=500&width=1000&inlineId=questionDiv";
 	tb_show("View Question",url,false);
 	}
+	
+	
+//build the print drug table
+function updatePrintableDrugs() {
+
+    var tbody = document.getElementById("printableTreatmentBody");
+
+    if (!tbody) {
+        return;
+    }
+
+    // Clear old print data
+    tbody.innerHTML = "";
+
+    var k = 1;
+
+    for (var i = 0; i < drugIssuedList1.length; i++) {
+
+        var drug = drugIssuedList1[i];
+
+        var formulationName =
+            document.getElementById(drug + "_formulationName");
+
+        var frequencyName =
+            document.getElementById(drug + "_frequencyName");
+
+        var noOfDays =
+            document.getElementById(drug + "_noOfDays");
+
+        var comments =
+            document.getElementById(drug + "_comments");
+
+        if (!formulationName ||
+            !frequencyName ||
+            !noOfDays ||
+            !comments) {
+            continue;
+        }
+
+        var drugArr = drug.split("+");
+
+        var row = document.createElement("tr");
+
+        row.align = "center";
+
+        row.innerHTML =
+              "<td>" + k + "</td>"
+            + "<td>" + drugArr[0] + "</td>"
+            + "<td>" + formulationName.value + "</td>"
+            + "<td>" + frequencyName.value + "</td>"
+            + "<td>" + noOfDays.value + "</td>"
+            + "<td>" + comments.value + "</td>";
+
+        tbody.appendChild(row);
+
+        k++;
+    }
+}
 
 // Print the slip
 function print() {
@@ -772,24 +860,9 @@ j++;
 }
 
 
-var selDrugLen = drugIssuedList1.length;
-
-var k=1;
-for(i=0; i<=selDrugLen-1; i++){
-var drug=drugIssuedList1[i];
-var drugArr=drug.split("+"); 
-var formulationName=document.getElementById(drug+"_formulationName").value;
-var frequencyName=document.getElementById(drug+"_frequencyName").value;
-var noOfDays=document.getElementById(drug+"_noOfDays").value;
-var comments=document.getElementById(drug+"_comments").value;
-jQuery("#printableSlNo").append("<span style='margin:5px;'>" + k + "<br/>" + "</span>");
-jQuery("#printableDrug").append("<span style='margin:5px;'>" + drugArr[0] + "<br/>" + "</span>");
-jQuery("#printableFormulation").append("<span style='margin:5px;'>" + formulationName + "<br/>" + "</span>");
-jQuery("#printableFrequency").append("<span style='margin:5px;'>" + frequencyName + "<br/>" + "</span>");
-jQuery("#printableNoOfDays").append("<span style='margin:5px;'>" + noOfDays + "<br/>" + "</span>");
-jQuery("#printableComments").append("<span style='margin:5px;'>" + comments + "<br/>" + "</span>");
-k++;
-}
+// Make sure previous + newly added drugs are included
+updateDrugIssuedList();
+updatePrintableDrugs();
 
 
 var otherInstructions = document.getElementById('otherInstructions').value;
@@ -1250,17 +1323,16 @@ jQuery("#BMI").val(b);
 						<input type='hidden' id="drugs" name="drugs" value='Drugss' size="14"
 							readonly="readonly" />&nbsp; 
 						<input type='text' id="drug" name="drug" value='Drugs' size="14"
-							readonly="readonly" />&nbsp; <input type='text' id="formulation"
-							name='formulation' value="Formulation" size="14"
-							readonly="readonly" />&nbsp; <input type='text' id='frequency'
-							name='frequency' value='Frequency' size="6" readonly="readonly" />&nbsp;
-						<input type='text' id='noOfDays' name='noOfDays'
-							value='No Of Days' size="7" readonly="readonly" />&nbsp; <input
-							type='text' id='comments' name='comments' value='Comments'
-							size="17" readonly="readonly" />&nbsp;
+							readonly="readonly" />&nbsp; 
+							<input type='text' id="headerFormulation" name='headerFormulation' value="Formulation" size="14" readonly="readonly" />
+							&nbsp; 
+							<input type='text' id="headerFrequency" name='headerFrequency' value='Frequency' size="6" readonly="readonly" />
+							&nbsp;
+						<input type='text' id="headerNoOfDays" name='headerNoOfDays' value='No Of Days' size="7" readonly="readonly" />
+						&nbsp; 
+						<input type='text' id="headerComments" name='headerComments' value='Comments' size="17" readonly="readonly" />
+						&nbsp;
 					</div>
-					<!-- PREVIOUS OPD DRUGS WILL COME HERE -->
-<div id="previousDrugList"></div>
 				</td>
 			</tr>
 			<tr>
@@ -1465,31 +1537,27 @@ jQuery("#BMI").val(b);
 		</table>
 		<table class="box">
 			<br />
-			<tr>
-				<center>
-					<b><font size="2">TREATMENT ADVISED</font></b>
-				</center>
-			</tr>
-			<!--
-<tr align="center"><th>--</th><th>--</th><th>--</th><th>--</th><th>--</th><th>--</th></tr>
--->
-			<tr align="center">
-				<th>S.No</th>
-				<th>Drug</th>
-				<th>Formulation</th>
-				<th>Frequency</th>
-				<th>No of Days</th>
-				<th>Comments</th>
-			</tr>
-			<tr align="center">
-				<td><div id="printableSlNo"></div></td>
-				<td><div id="printableDrug"></div></td>
-				<td><div id="printableFormulation"></div></td>
-				<td><div id="printableFrequency"></div></td>
-				<td><div id="printableNoOfDays"></div></td>
-				<td><div id="printableComments"></div></td>
-			</tr>
-		</table>
+			<table class="box">
+    <br />
+
+    <tr>
+        <center>
+            <b><font size="2">TREATMENT ADVISED</font></b>
+        </center>
+    </tr>
+
+    <tr align="center">
+        <th>S.No</th>
+        <th>Drug</th>
+        <th>Formulation</th>
+        <th>Frequency</th>
+        <th>No of Days</th>
+        <th>Comments</th>
+    </tr>
+
+    <tbody id="printableTreatmentBody">
+    </tbody>
+</table>
 		<table class="box">
 			<tr id="othInst">
 				<td><strong>Other Instructions:</strong></td>
